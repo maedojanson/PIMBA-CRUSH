@@ -1,316 +1,180 @@
 using UnityEngine;
-using System.Collections;
 using System.Collections.Generic;
 
 public class TabuleiroManager : MonoBehaviour
 {
-    [Header("Tabuleiro")]
     public int linhas = 6;
     public int colunas = 6;
-    public float tamanhoPeca = 100f;
 
-    [Header("Prefabs das Peças")]
     public GameObject[] prefabsPecas;
+    public Transform paiDoTabuleiro;
 
-    [Header("Área do Tabuleiro")]
-    public RectTransform areaTabuleiro;
+    public float distancia = 100f;
 
     private GameObject[,] pecas;
     private int[,] tipos;
 
-    private Peca pecaSelecionada;
     private bool aProcessar = false;
-
-    // SEGURANÇA:
-    // nunca permite mais de 10 cascatas seguidas
-    private const int MAX_CASCATAS = 10;
 
     void Start()
     {
-        CriarTabuleiroInicial();
+        if (prefabsPecas == null ||
+            prefabsPecas.Length == 0)
+        {
+            Debug.LogError(
+                "PIMBA CRUSH: Não existem prefabs de peças ligados!"
+            );
+            return;
+        }
+
+        CriarTabuleiro();
     }
 
-    void OnDisable()
-    {
-        aProcessar = false;
-        pecaSelecionada = null;
-    }
-
-    // =========================================================
-    // TABULEIRO INICIAL
-    // =========================================================
-
-    void CriarTabuleiroInicial()
+    void CriarTabuleiro()
     {
         pecas = new GameObject[linhas, colunas];
         tipos = new int[linhas, colunas];
 
-        for (int linha = 0; linha < linhas; linha++)
+        for (int l = 0; l < linhas; l++)
         {
-            for (int coluna = 0; coluna < colunas; coluna++)
+            for (int c = 0; c < colunas; c++)
             {
-                int tipo;
-
-                do
-                {
-                    tipo = Random.Range(
-                        0,
-                        prefabsPecas.Length
-                    );
-                }
-                while (
-                    CriariaCombinacaoInicial(
-                        linha,
-                        coluna,
-                        tipo
-                    )
-                );
-
-                tipos[linha, coluna] = tipo;
+                int tipo = EscolherTipoInicial(l, c);
 
                 CriarPeca(
-                    linha,
-                    coluna,
+                    l,
+                    c,
                     tipo
                 );
             }
         }
     }
 
-    bool CriariaCombinacaoInicial(
-        int linha,
-        int coluna,
+    int EscolherTipoInicial(int l, int c)
+    {
+        List<int> disponiveis =
+            new List<int>();
+
+        for (int i = 0; i < prefabsPecas.Length; i++)
+        {
+            if (!CriariaTrio(l, c, i))
+            {
+                disponiveis.Add(i);
+            }
+        }
+
+        if (disponiveis.Count == 0)
+        {
+            return Random.Range(
+                0,
+                prefabsPecas.Length
+            );
+        }
+
+        return disponiveis[
+            Random.Range(
+                0,
+                disponiveis.Count
+            )
+        ];
+    }
+
+    bool CriariaTrio(
+        int l,
+        int c,
         int tipo
     )
     {
-        if (
-            coluna >= 2 &&
-            tipos[linha, coluna - 1] == tipo &&
-            tipos[linha, coluna - 2] == tipo
-        )
+        if (c >= 2)
         {
-            return true;
+            if (tipos[l, c - 1] == tipo &&
+                tipos[l, c - 2] == tipo)
+            {
+                return true;
+            }
         }
 
-        if (
-            linha >= 2 &&
-            tipos[linha - 1, coluna] == tipo &&
-            tipos[linha - 2, coluna] == tipo
-        )
+        if (l >= 2)
         {
-            return true;
+            if (tipos[l - 1, c] == tipo &&
+                tipos[l - 2, c] == tipo)
+            {
+                return true;
+            }
         }
 
         return false;
     }
 
-    // =========================================================
-    // CRIAR PEÇA
-    // =========================================================
-
     void CriarPeca(
-        int linha,
-        int coluna,
+        int l,
+        int c,
         int tipo
     )
     {
-        GameObject prefab =
-            ObterPrefab(tipo);
-
-        if (prefab == null)
+        if (l < 0 || l >= linhas)
             return;
 
-        GameObject novaPeca =
-            Instantiate(
-                prefab,
-                areaTabuleiro
-            );
-
-        novaPeca.name =
-            "Peca_" +
-            linha +
-            "_" +
-            coluna;
-
-        Peca componente =
-            novaPeca.GetComponent<Peca>();
-
-        if (componente != null)
-        {
-            componente.Configurar(
-                this,
-                linha,
-                coluna
-            );
-        }
-
-        pecas[linha, coluna] =
-            novaPeca;
-
-        tipos[linha, coluna] =
-            tipo;
-
-        ColocarNoLugar(
-            novaPeca,
-            linha,
-            coluna
-        );
-    }
-
-    GameObject ObterPrefab(int tipo)
-    {
-        if (
-            prefabsPecas == null ||
-            prefabsPecas.Length == 0
-        )
-        {
-            Debug.LogError(
-                "PIMBA CRUSH: Não existem prefabs."
-            );
-
-            return null;
-        }
-
-        if (
-            tipo < 0 ||
-            tipo >= prefabsPecas.Length
-        )
-        {
-            Debug.LogError(
-                "PIMBA CRUSH: Tipo inválido: " +
-                tipo
-            );
-
-            return null;
-        }
-
-        return prefabsPecas[tipo];
-    }
-
-    void ColocarNoLugar(
-        GameObject objeto,
-        int linha,
-        int coluna
-    )
-    {
-        if (
-            objeto == null ||
-            areaTabuleiro == null
-        )
-        {
-            return;
-        }
-
-        RectTransform rect =
-            objeto.GetComponent<RectTransform>();
-
-        if (rect == null)
+        if (c < 0 || c >= colunas)
             return;
 
-        float largura =
-            areaTabuleiro.rect.width /
-            colunas;
-
-        float altura =
-            areaTabuleiro.rect.height /
-            linhas;
-
-        float x =
-            -areaTabuleiro.rect.width / 2f +
-            largura * coluna +
-            largura / 2f;
-
-        float y =
-            areaTabuleiro.rect.height / 2f -
-            altura * linha -
-            altura / 2f;
-
-        rect.anchoredPosition =
-            new Vector2(x, y);
-
-        rect.sizeDelta =
-            new Vector2(
-                largura,
-                altura
-            );
-    }
-
-    // =========================================================
-    // CLIQUE
-    // =========================================================
-
-    public void ClicarNaPeca(Peca peca)
-    {
-        if (
-            aProcessar ||
-            peca == null
-        )
-        {
+        if (tipo < 0 ||
+            tipo >= prefabsPecas.Length)
             return;
-        }
 
-        if (pecaSelecionada == null)
-        {
-            pecaSelecionada = peca;
+        if (prefabsPecas[tipo] == null)
             return;
-        }
 
-        if (pecaSelecionada == peca)
+        GameObject novaPeca;
+
+        if (paiDoTabuleiro != null)
         {
-            pecaSelecionada = null;
-            return;
-        }
-
-        if (
-            !SaoAdjacentes(
-                pecaSelecionada,
-                peca
-            )
-        )
-        {
-            pecaSelecionada = peca;
-            return;
-        }
-
-        Peca primeira =
-            pecaSelecionada;
-
-        Peca segunda =
-            peca;
-
-        pecaSelecionada = null;
-
-        TrocarPecas(
-            primeira,
-            segunda
-        );
-
-        List<Peca> combinacoes =
-            EncontrarCombinacoesDasPecas(
-                primeira,
-                segunda
-            );
-
-        if (combinacoes.Count > 0)
-        {
-            StartCoroutine(
-                ProcessarCombinacoes(
-                    combinacoes
-                )
+            novaPeca = Instantiate(
+                prefabsPecas[tipo],
+                paiDoTabuleiro
             );
         }
         else
         {
-            TrocarPecas(
-                primeira,
-                segunda
+            novaPeca = Instantiate(
+                prefabsPecas[tipo]
             );
         }
+
+        novaPeca.transform.localPosition =
+            new Vector3(
+                c * distancia,
+                -l * distancia,
+                0
+            );
+
+        Peca peca =
+            novaPeca.GetComponent<Peca>();
+
+        if (peca == null)
+        {
+            peca =
+                novaPeca.AddComponent<Peca>();
+        }
+
+        peca.Configurar(
+            this,
+            l,
+            c
+        );
+
+        pecas[l, c] =
+            novaPeca;
+
+        tipos[l, c] =
+            tipo;
     }
 
-    // =========================================================
-    // ARRASTAR
-    // =========================================================
+    public void ClicarNaPeca(Peca peca)
+    {
+        if (aProcessar)
+            return;
+    }
 
     public void ArrastarPeca(
         Peca peca,
@@ -318,13 +182,11 @@ public class TabuleiroManager : MonoBehaviour
         int direcaoColuna
     )
     {
-        if (
-            aProcessar ||
-            peca == null
-        )
-        {
+        if (aProcessar)
             return;
-        }
+
+        if (peca == null)
+            return;
 
         int novaLinha =
             peca.linha +
@@ -334,689 +196,290 @@ public class TabuleiroManager : MonoBehaviour
             peca.coluna +
             direcaoColuna;
 
-        if (
-            novaLinha < 0 ||
+        if (novaLinha < 0 ||
             novaLinha >= linhas ||
             novaColuna < 0 ||
-            novaColuna >= colunas
-        )
+            novaColuna >= colunas)
         {
             return;
         }
 
-        GameObject objetoVizinho =
-            pecas[
-                novaLinha,
-                novaColuna
-            ];
-
-        if (objetoVizinho == null)
+        if (pecas[novaLinha, novaColuna] == null)
             return;
 
-        Peca vizinha =
-            objetoVizinho.GetComponent<Peca>();
+        Peca outra =
+            pecas[novaLinha, novaColuna]
+            .GetComponent<Peca>();
 
-        if (vizinha == null)
+        if (outra == null)
             return;
 
         TrocarPecas(
             peca,
-            vizinha
+            outra
         );
 
         List<Peca> combinacoes =
-            EncontrarCombinacoesDasPecas(
-                peca,
-                vizinha
+            EncontrarCombinacoes();
+
+        if (combinacoes.Count >= 3)
+        {
+            aProcessar = true;
+
+            SubstituirCombinacoes(
+                combinacoes
             );
 
-        if (combinacoes.Count > 0)
-        {
-            StartCoroutine(
-                ProcessarCombinacoes(
-                    combinacoes
-                )
-            );
+            aProcessar = false;
         }
         else
         {
             TrocarPecas(
                 peca,
-                vizinha
+                outra
             );
         }
     }
-
-    // =========================================================
-    // ADJACÊNCIA
-    // =========================================================
-
-    bool SaoAdjacentes(
-        Peca a,
-        Peca b
-    )
-    {
-        int diferencaLinha =
-            Mathf.Abs(
-                a.linha - b.linha
-            );
-
-        int diferencaColuna =
-            Mathf.Abs(
-                a.coluna - b.coluna
-            );
-
-        return
-            diferencaLinha +
-            diferencaColuna == 1;
-    }
-
-    // =========================================================
-    // TROCAR
-    // =========================================================
 
     void TrocarPecas(
         Peca a,
         Peca b
     )
     {
-        int linhaA = a.linha;
-        int colunaA = a.coluna;
+        int linhaA =
+            a.linha;
 
-        int linhaB = b.linha;
-        int colunaB = b.coluna;
+        int colunaA =
+            a.coluna;
+
+        int linhaB =
+            b.linha;
+
+        int colunaB =
+            b.coluna;
 
         GameObject objetoA =
-            pecas[
-                linhaA,
-                colunaA
-            ];
+            pecas[linhaA, colunaA];
 
         GameObject objetoB =
-            pecas[
-                linhaB,
-                colunaB
-            ];
+            pecas[linhaB, colunaB];
 
         int tipoA =
-            tipos[
-                linhaA,
-                colunaA
-            ];
+            tipos[linhaA, colunaA];
 
         int tipoB =
-            tipos[
-                linhaB,
-                colunaB
-            ];
+            tipos[linhaB, colunaB];
 
-        pecas[
-            linhaA,
-            colunaA
-        ] = objetoB;
+        pecas[linhaA, colunaA] =
+            objetoB;
 
-        pecas[
-            linhaB,
-            colunaB
-        ] = objetoA;
+        pecas[linhaB, colunaB] =
+            objetoA;
 
-        tipos[
-            linhaA,
-            colunaA
-        ] = tipoB;
+        tipos[linhaA, colunaA] =
+            tipoB;
 
-        tipos[
-            linhaB,
-            colunaB
-        ] = tipoA;
+        tipos[linhaB, colunaB] =
+            tipoA;
 
-        a.linha = linhaB;
-        a.coluna = colunaB;
-
-        b.linha = linhaA;
-        b.coluna = colunaA;
-
-        ColocarNoLugar(
-            objetoA,
+        a.Configurar(
+            this,
             linhaB,
             colunaB
         );
 
-        ColocarNoLugar(
-            objetoB,
+        b.Configurar(
+            this,
             linhaA,
             colunaA
         );
+
+        Posicionar(a);
+        Posicionar(b);
     }
 
-    // =========================================================
-    // COMBINAÇÕES DO MOVIMENTO
-    // =========================================================
-
-    List<Peca> EncontrarCombinacoesDasPecas(
-        Peca primeira,
-        Peca segunda
-    )
-    {
-        HashSet<Peca> resultado =
-            new HashSet<Peca>();
-
-        AdicionarCombinacoesDaPeca(
-            primeira,
-            resultado
-        );
-
-        AdicionarCombinacoesDaPeca(
-            segunda,
-            resultado
-        );
-
-        return new List<Peca>(
-            resultado
-        );
-    }
-
-    void AdicionarCombinacoesDaPeca(
-        Peca peca,
-        HashSet<Peca> resultado
-    )
+    void Posicionar(Peca peca)
     {
         if (peca == null)
             return;
 
-        int tipo =
-            tipos[
-                peca.linha,
-                peca.coluna
-            ];
-
-        List<Peca> horizontal =
-            EncontrarLinha(
-                peca.linha,
-                peca.coluna,
-                tipo
+        peca.transform.localPosition =
+            new Vector3(
+                peca.coluna * distancia,
+                -peca.linha * distancia,
+                0
             );
-
-        if (horizontal.Count >= 3)
-        {
-            foreach (Peca p in horizontal)
-            {
-                if (p != null)
-                    resultado.Add(p);
-            }
-        }
-
-        List<Peca> vertical =
-            EncontrarColuna(
-                peca.linha,
-                peca.coluna,
-                tipo
-            );
-
-        if (vertical.Count >= 3)
-        {
-            foreach (Peca p in vertical)
-            {
-                if (p != null)
-                    resultado.Add(p);
-            }
-        }
     }
 
-    // =========================================================
-    // LINHA
-    // =========================================================
-
-    List<Peca> EncontrarLinha(
-        int linha,
-        int coluna,
-        int tipo
-    )
+    List<Peca> EncontrarCombinacoes()
     {
         List<Peca> resultado =
             new List<Peca>();
 
-        for (
-            int c = coluna;
-            c >= 0;
-            c--
-        )
-        {
-            if (
-                tipos[linha, c] != tipo
-            )
-            {
-                break;
-            }
+        // HORIZONTAL
 
-            if (
-                pecas[linha, c] != null
-            )
-            {
-                Peca p =
-                    pecas[
-                        linha,
-                        c
-                    ].GetComponent<Peca>();
-
-                if (p != null)
-                    resultado.Add(p);
-            }
-        }
-
-        for (
-            int c = coluna + 1;
-            c < colunas;
-            c++
-        )
-        {
-            if (
-                tipos[linha, c] != tipo
-            )
-            {
-                break;
-            }
-
-            if (
-                pecas[linha, c] != null
-            )
-            {
-                Peca p =
-                    pecas[
-                        linha,
-                        c
-                    ].GetComponent<Peca>();
-
-                if (p != null)
-                    resultado.Add(p);
-            }
-        }
-
-        return resultado;
-    }
-
-    // =========================================================
-    // COLUNA
-    // =========================================================
-
-    List<Peca> EncontrarColuna(
-        int linha,
-        int coluna,
-        int tipo
-    )
-    {
-        List<Peca> resultado =
-            new List<Peca>();
-
-        for (
-            int l = linha;
-            l >= 0;
-            l--
-        )
-        {
-            if (
-                tipos[l, coluna] != tipo
-            )
-            {
-                break;
-            }
-
-            if (
-                pecas[l, coluna] != null
-            )
-            {
-                Peca p =
-                    pecas[
-                        l,
-                        coluna
-                    ].GetComponent<Peca>();
-
-                if (p != null)
-                    resultado.Add(p);
-            }
-        }
-
-        for (
-            int l = linha + 1;
-            l < linhas;
-            l++
-        )
-        {
-            if (
-                tipos[l, coluna] != tipo
-            )
-            {
-                break;
-            }
-
-            if (
-                pecas[l, coluna] != null
-            )
-            {
-                Peca p =
-                    pecas[
-                        l,
-                        coluna
-                    ].GetComponent<Peca>();
-
-                if (p != null)
-                    resultado.Add(p);
-            }
-        }
-
-        return resultado;
-    }
-
-    // =========================================================
-    // PROCURAR CASCATAS
-    // =========================================================
-
-    List<Peca> EncontrarTodasAsCombinacoes()
-    {
-        HashSet<Peca> resultado =
-            new HashSet<Peca>();
-
-        for (
-            int linha = 0;
-            linha < linhas;
-            linha++
-        )
+        for (int l = 0; l < linhas; l++)
         {
             for (
-                int coluna = 0;
-                coluna < colunas;
-                coluna++
+                int c = 0;
+                c < colunas - 2;
+                c++
             )
             {
                 if (
-                    pecas[
-                        linha,
-                        coluna
-                    ] == null
+                    tipos[l, c] ==
+                    tipos[l, c + 1] &&
+                    tipos[l, c] ==
+                    tipos[l, c + 2]
                 )
                 {
-                    continue;
-                }
-
-                Peca peca =
-                    pecas[
-                        linha,
-                        coluna
-                    ].GetComponent<Peca>();
-
-                if (peca == null)
-                    continue;
-
-                int tipo =
-                    tipos[
-                        linha,
-                        coluna
-                    ];
-
-                List<Peca> horizontal =
-                    EncontrarLinha(
-                        linha,
-                        coluna,
-                        tipo
+                    Adicionar(
+                        resultado,
+                        l,
+                        c
                     );
 
-                if (horizontal.Count >= 3)
-                {
-                    foreach (Peca p in horizontal)
-                    {
-                        if (p != null)
-                            resultado.Add(p);
-                    }
-                }
-
-                List<Peca> vertical =
-                    EncontrarColuna(
-                        linha,
-                        coluna,
-                        tipo
+                    Adicionar(
+                        resultado,
+                        l,
+                        c + 1
                     );
 
-                if (vertical.Count >= 3)
-                {
-                    foreach (Peca p in vertical)
-                    {
-                        if (p != null)
-                            resultado.Add(p);
-                    }
+                    Adicionar(
+                        resultado,
+                        l,
+                        c + 2
+                    );
                 }
             }
         }
 
-        return new List<Peca>(
-            resultado
-        );
-    }
+        // VERTICAL
 
-    // =========================================================
-    // PROCESSAR COMBINAÇÕES
-    // =========================================================
-
-    IEnumerator ProcessarCombinacoes(
-        List<Peca> combinacoesIniciais
-    )
-    {
-        aProcessar = true;
-
-        List<Peca> combinacoes =
-            combinacoesIniciais;
-
-        // IMPORTANTE:
-        // limite absoluto para nunca bloquear o Unity
-        for (
-            int cascata = 0;
-            cascata < MAX_CASCATAS;
-            cascata++
-        )
+        for (int c = 0; c < colunas; c++)
         {
-            if (
-                combinacoes == null ||
-                combinacoes.Count == 0
+            for (
+                int l = 0;
+                l < linhas - 2;
+                l++
             )
             {
-                break;
-            }
-
-            HashSet<Peca> unicas =
-                new HashSet<Peca>();
-
-            foreach (Peca p in combinacoes)
-            {
-                if (p != null)
-                    unicas.Add(p);
-            }
-
-            if (unicas.Count == 0)
-                break;
-
-            // ---------------------------------------------
-            // DESAPARECER
-            // ---------------------------------------------
-
-            foreach (Peca p in unicas)
-            {
-                if (p != null)
+                if (
+                    tipos[l, c] ==
+                    tipos[l + 1, c] &&
+                    tipos[l, c] ==
+                    tipos[l + 2, c]
+                )
                 {
-                    StartCoroutine(
-                        p.FadeOut(0.15f)
+                    Adicionar(
+                        resultado,
+                        l,
+                        c
+                    );
+
+                    Adicionar(
+                        resultado,
+                        l + 1,
+                        c
+                    );
+
+                    Adicionar(
+                        resultado,
+                        l + 2,
+                        c
                     );
                 }
             }
+        }
 
-            yield return new WaitForSeconds(
-                0.17f
-            );
+        return resultado;
+    }
 
-            // ---------------------------------------------
-            // REMOVER
-            // ---------------------------------------------
+    void Adicionar(
+        List<Peca> lista,
+        int l,
+        int c
+    )
+    {
+        if (l < 0 ||
+            l >= linhas)
+            return;
 
-            foreach (Peca p in unicas)
+        if (c < 0 ||
+            c >= colunas)
+            return;
+
+        if (pecas[l, c] == null)
+            return;
+
+        Peca peca =
+            pecas[l, c]
+            .GetComponent<Peca>();
+
+        if (peca != null &&
+            !lista.Contains(peca))
+        {
+            lista.Add(peca);
+        }
+    }
+
+    void SubstituirCombinacoes(
+        List<Peca> combinacoes
+    )
+    {
+        foreach (Peca peca in combinacoes)
+        {
+            if (peca == null)
+                continue;
+
+            int l =
+                peca.linha;
+
+            int c =
+                peca.coluna;
+
+            if (l < 0 ||
+                l >= linhas ||
+                c < 0 ||
+                c >= colunas)
+                continue;
+
+            GameObject antiga =
+                pecas[l, c];
+
+            if (antiga != null)
             {
-                if (p == null)
-                    continue;
-
-                int linha = p.linha;
-                int coluna = p.coluna;
-
-                if (
-                    linha >= 0 &&
-                    linha < linhas &&
-                    coluna >= 0 &&
-                    coluna < colunas &&
-                    pecas[
-                        linha,
-                        coluna
-                    ] == p.gameObject
-                )
-                {
-                    pecas[
-                        linha,
-                        coluna
-                    ] = null;
-
-                    tipos[
-                        linha,
-                        coluna
-                    ] = -1;
-                }
-
                 Destroy(
-                    p.gameObject
+                    antiga
                 );
             }
 
-            // ---------------------------------------------
-            // FAZER CAIR
-            // ---------------------------------------------
-
-            for (
-                int coluna = 0;
-                coluna < colunas;
-                coluna++
-            )
-            {
-                int destino =
-                    linhas - 1;
-
-                for (
-                    int linha = linhas - 1;
-                    linha >= 0;
-                    linha--
-                )
-                {
-                    if (
-                        pecas[
-                            linha,
-                            coluna
-                        ] == null
-                    )
-                    {
-                        continue;
-                    }
-
-                    if (linha != destino)
-                    {
-                        GameObject objeto =
-                            pecas[
-                                linha,
-                                coluna
-                            ];
-
-                        int tipo =
-                            tipos[
-                                linha,
-                                coluna
-                            ];
-
-                        pecas[
-                            destino,
-                            coluna
-                        ] = objeto;
-
-                        tipos[
-                            destino,
-                            coluna
-                        ] = tipo;
-
-                        pecas[
-                            linha,
-                            coluna
-                        ] = null;
-
-                        tipos[
-                            linha,
-                            coluna
-                        ] = -1;
-
-                        Peca peca =
-                            objeto.GetComponent<Peca>();
-
-                        if (peca != null)
-                        {
-                            peca.linha =
-                                destino;
-
-                            peca.coluna =
-                                coluna;
-                        }
-
-                        ColocarNoLugar(
-                            objeto,
-                            destino,
-                            coluna
-                        );
-                    }
-
-                    destino--;
-                }
-
-                // -----------------------------------------
-                // NOVAS PEÇAS
-                // -----------------------------------------
-
-                for (
-                    int linha = destino;
-                    linha >= 0;
-                    linha--
-                )
-                {
-                    int tipo =
-                        Random.Range(
-                            0,
-                            prefabsPecas.Length
-                        );
-
-                    CriarPeca(
-                        linha,
-                        coluna,
-                        tipo
-                    );
-                }
-            }
-
-            yield return new WaitForSeconds(
-                0.12f
-            );
-
-            // -----------------------------------------
-            // VER SE HOUVE CASCATA
-            // -----------------------------------------
-
-            combinacoes =
-                EncontrarTodasAsCombinacoes();
+            pecas[l, c] =
+                null;
         }
 
-        // SEGURANÇA FINAL
-        pecaSelecionada = null;
-        aProcessar = false;
+        foreach (Peca peca in combinacoes)
+        {
+            if (peca == null)
+                continue;
 
-        Debug.Log(
-            "PIMBA CRUSH: processamento terminado."
-        );
+            int l =
+                peca.linha;
+
+            int c =
+                peca.coluna;
+
+            int tipo =
+                Random.Range(
+                    0,
+                    prefabsPecas.Length
+                );
+
+            CriarPeca(
+                l,
+                c,
+                tipo
+            );
+        }
     }
 }
