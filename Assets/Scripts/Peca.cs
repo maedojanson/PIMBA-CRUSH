@@ -1,9 +1,9 @@
+
 using UnityEngine;
 using UnityEngine.EventSystems;
 using System.Collections;
 
-public class Peca :
-    MonoBehaviour,
+public class Peca : MonoBehaviour,
     IPointerDownHandler,
     IPointerUpHandler
 {
@@ -11,9 +11,7 @@ public class Peca :
     public int coluna;
 
     private TabuleiroManager tabuleiroManager;
-
     private Vector2 posicaoInicial;
-
     private bool pressionada = false;
 
     public void Configurar(
@@ -23,27 +21,20 @@ public class Peca :
     )
     {
         tabuleiroManager = manager;
-
         linha = novaLinha;
         coluna = novaColuna;
     }
 
-    public void OnPointerDown(
-        PointerEventData eventData
-    )
+    public void OnPointerDown(PointerEventData eventData)
     {
         if (tabuleiroManager == null)
             return;
 
-        posicaoInicial =
-            eventData.position;
-
+        posicaoInicial = eventData.position;
         pressionada = true;
     }
 
-    public void OnPointerUp(
-        PointerEventData eventData
-    )
+    public void OnPointerUp(PointerEventData eventData)
     {
         if (!pressionada)
             return;
@@ -54,42 +45,28 @@ public class Peca :
             return;
 
         Vector2 movimento =
-            eventData.position -
-            posicaoInicial;
+            eventData.position - posicaoInicial;
 
         int direcaoLinha = 0;
         int direcaoColuna = 0;
 
-        if (
-            Mathf.Abs(movimento.x) >
-            Mathf.Abs(movimento.y)
-        )
+        if (Mathf.Abs(movimento.x) >
+            Mathf.Abs(movimento.y))
         {
             if (movimento.x > 30f)
-            {
                 direcaoColuna = 1;
-            }
             else if (movimento.x < -30f)
-            {
                 direcaoColuna = -1;
-            }
         }
         else
         {
             if (movimento.y > 30f)
-            {
                 direcaoLinha = -1;
-            }
             else if (movimento.y < -30f)
-            {
                 direcaoLinha = 1;
-            }
         }
 
-        if (
-            direcaoLinha != 0 ||
-            direcaoColuna != 0
-        )
+        if (direcaoLinha != 0 || direcaoColuna != 0)
         {
             tabuleiroManager.ArrastarPeca(
                 this,
@@ -99,24 +76,20 @@ public class Peca :
         }
         else
         {
-            tabuleiroManager.ClicarNaPeca(
-                this
-            );
+            tabuleiroManager.ClicarNaPeca(this);
         }
     }
 
-    public IEnumerator FadeOut(
-        float duracao
-    )
+    // ANIMAÇÃO DE DESAPARECIMENTO
+    public IEnumerator FadeOut(float duracao)
     {
-        CanvasGroup grupo =
-            GetComponent<CanvasGroup>();
+        CanvasGroup grupo = GetComponent<CanvasGroup>();
 
         if (grupo == null)
-        {
-            grupo =
-                gameObject.AddComponent<CanvasGroup>();
-        }
+            grupo = gameObject.AddComponent<CanvasGroup>();
+
+        grupo.interactable = false;
+        grupo.blocksRaycasts = false;
 
         float tempo = 0f;
 
@@ -124,16 +97,46 @@ public class Peca :
         {
             tempo += Time.deltaTime;
 
-            grupo.alpha =
-                Mathf.Lerp(
-                    1f,
-                    0f,
-                    tempo / duracao
-                );
+            grupo.alpha = Mathf.Lerp(
+                1f,
+                0f,
+                Mathf.Clamp01(tempo / duracao)
+            );
 
             yield return null;
         }
 
         grupo.alpha = 0f;
     }
+
+    // ANIMAÇÃO DE APARECIMENTO
+    public IEnumerator FadeIn(float duracao)
+    {
+        CanvasGroup grupo = GetComponent<CanvasGroup>();
+
+        if (grupo == null)
+            grupo = gameObject.AddComponent<CanvasGroup>();
+
+        grupo.alpha = 0f;
+        grupo.interactable = true;
+        grupo.blocksRaycasts = true;
+
+        float tempo = 0f;
+
+        while (tempo < duracao)
+        {
+            tempo += Time.deltaTime;
+
+            grupo.alpha = Mathf.Lerp(
+                0f,
+                1f,
+                Mathf.Clamp01(tempo / duracao)
+            );
+
+            yield return null;
+        }
+
+        grupo.alpha = 1f;
+    }
 }
+
