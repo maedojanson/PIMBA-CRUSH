@@ -1,6 +1,6 @@
-
 using UnityEngine;
 using UnityEngine.UI;
+using TMPro;
 using System.Collections;
 using System.Collections.Generic;
 
@@ -14,14 +14,31 @@ public class TabuleiroManager : MonoBehaviour
     public GameObject[] prefabsPecas;
     public Transform paiDoTabuleiro;
 
+    [Header("Pontuação e movimentos")]
+    public TMP_Text scoreTexto;
+    public TMP_Text movesTexto;
+    public GameManager gameManager;
+
+    [Header("Som das jogadas")]
+    public AudioSource audioSource;
+    public AudioClip somMovimento;
+
     private GameObject[,] pecas;
     private int[,] tipos;
 
     private bool aProcessar = false;
+    private bool jogoTerminado = false;
     private GridLayoutGroup grelha;
+
+    private int pontuacao = 0;
+    private int movimentos = 40;
+
+    private const int pontuacaoObjetivo = 250;
 
     void Start()
     {
+        ReiniciarJogo();
+
         if (prefabsPecas == null || prefabsPecas.Length < 3)
         {
             Debug.LogError("PIMBA CRUSH: São necessárias pelo menos 3 peças diferentes!");
@@ -45,9 +62,57 @@ public class TabuleiroManager : MonoBehaviour
         grelha.enabled = true;
 
         CriarTabuleiro();
+        StartCoroutine(VerificarTabuleiroInicial());
     }
 
-    // CRIAR O TABULEIRO INICIAL
+    // REINICIAR PONTUAÇÃO E MOVIMENTOS
+    public void ReiniciarJogo()
+    {
+        pontuacao = 0;
+        movimentos = 40;
+        jogoTerminado = false;
+        aProcessar = false;
+
+        AtualizarTextos();
+    }
+
+    // ATUALIZAR OS TEXTOS
+    void AtualizarTextos()
+    {
+        if (scoreTexto != null)
+            scoreTexto.text = pontuacao.ToString();
+
+        if (movesTexto != null)
+            movesTexto.text = movimentos.ToString();
+    }
+
+    // VERIFICAR SE O JOGO TERMINOU
+    void VerificarFimDoJogo()
+    {
+        if (jogoTerminado)
+            return;
+
+        if (pontuacao >= pontuacaoObjetivo)
+        {
+            jogoTerminado = true;
+
+            if (gameManager != null)
+                gameManager.MostrarVitoria();
+            else
+                Debug.LogError("PIMBA CRUSH: GameManager não está ligado!");
+        }
+        else if (movimentos <= 0)
+        {
+            jogoTerminado = true;
+
+            if (gameManager != null)
+                gameManager.MostrarDerrota();
+            else
+                Debug.LogError("PIMBA CRUSH: GameManager não está ligado!");
+        }
+    }
+
+    // CRIAR O TABULEIRO
     void CriarTabuleiro()
     {
         pecas = new GameObject[linhas, colunas];
@@ -56,11 +121,10 @@ public class TabuleiroManager : MonoBehaviour
         for (int l = 0; l < linhas; l++)
         {
             for (int c = 0; c < colunas; c++)
-            {
                 tipos[l, c] = -1;
-            }
         }
 
+        // REMOVER PEÇAS ANTIGAS
         for (int i = paiDoTabuleiro.childCount - 1; i >= 0; i--)
         {
             Transform filho = paiDoTabuleiro.GetChild(i);
@@ -124,7 +188,8 @@ public class TabuleiroManager : MonoBehaviour
         pecas[l, c] = nova;
         tipos[l, c] = tipo;
 
-        StartCoroutine(componente.FadeIn(0.25f));
+        // Fade In desativado para manter as peças visíveis.
+        // StartCoroutine(componente.FadeIn(0.25f));
     }
 
     // ATUALIZAR A ORDEM VISUAL DA GRELHA
@@ -140,9 +205,7 @@ public class TabuleiroManager : MonoBehaviour
             for (int c = 0; c < colunas; c++)
             {
                 if (pecas[l, c] != null)
-                {
                     pecas[l, c].transform.SetSiblingIndex(indice);
-                }
 
                 indice++;
             }
@@ -167,7 +230,7 @@ public class TabuleiroManager : MonoBehaviour
         int direcaoColuna
     )
     {
-        if (aProcessar || peca == null)
+        if (aProcessar || jogoTerminado || peca == null)
             return;
 
         int novaLinha = peca.linha + direcaoLinha;
@@ -230,6 +293,16 @@ public class TabuleiroManager : MonoBehaviour
             yield break;
         }
 
+        // JOGADA VÁLIDA: RETIRAR UM MOVIMENTO
+        movimentos--;
+        AtualizarTextos();
+
+        // TOCAR SOM DA JOGADA VÁLIDA
+        if (audioSource != null && somMovimento != null)
+        {
+            audioSource.PlayOneShot(somMovimento);
+        }
+
         // PROCESSAR COMBINAÇÕES E REAÇÕES EM CADEIA
         int seguranca = 0;
 
@@ -245,6 +318,15 @@ public class TabuleiroManager : MonoBehaviour
         }
 
         AtualizarOrdemVisual();
+
+        // VERIFICAR SE O JOGO TERMINOU
+        VerificarFimDoJogo();
+
+        // VERIFICAR SE AINDA EXISTEM JOGADAS POSSÍVEIS
+        if (!jogoTerminado && !ExisteJogadaPossivel())
+        {
+            yield return StartCoroutine(FazerRefresh());
+        }
 
         aProcessar = false;
     }
@@ -278,7 +360,6 @@ public class TabuleiroManager : MonoBehaviour
     List<Peca> EncontrarCombinacoes()
     {
         List<Peca> resultado = new List<Peca>();
-
         bool[,] marcadas = new bool[linhas, colunas];
 
         // HORIZONTAL
@@ -361,6 +442,14 @@ public class TabuleiroManager : MonoBehaviour
     {
         bool[,] removidas = new bool[linhas, colunas];
 
+        // ATRIBUIR PONTOS À COMBINAÇÃO
+        if (combinacoes.Count == 3)
+            pontuacao += 5;
+        else if (combinacoes.Count > 3)
+            pontuacao += 10;
+
+        AtualizarTextos();
+
         // MARCAR E ANIMAR AS PEÇAS
         foreach (Peca peca in combinacoes)
         {
@@ -410,7 +499,7 @@ public class TabuleiroManager : MonoBehaviour
                         tipos[l, c] = -1;
                     }
 
-                    // CORRIGIR AS COORDENADAS DA PEÇA!
+                    // ATUALIZAR AS COORDENADAS DA PEÇA
                     Peca componente =
                         pecas[destino, c].GetComponent<Peca>();
 
@@ -455,8 +544,6 @@ public class TabuleiroManager : MonoBehaviour
                 disponiveis.Add(tipo);
         }
 
-        // Com pelo menos 3 tipos diferentes,
-        // deverá existir sempre uma opção válida.
         if (disponiveis.Count == 0)
         {
             Debug.LogWarning(
@@ -470,5 +557,118 @@ public class TabuleiroManager : MonoBehaviour
             Random.Range(0, disponiveis.Count)
         ];
     }
+
+    // VERIFICAR SE EXISTE ALGUMA TROCA QUE FORME UMA COMBINAÇÃO
+    bool ExisteJogadaPossivel()
+    {
+        for (int l = 0; l < linhas; l++)
+        {
+            for (int c = 0; c < colunas; c++)
+            {
+                if (pecas[l, c] == null)
+                    continue;
+
+                // TESTAR TROCA PARA A DIREITA
+                if (c + 1 < colunas && pecas[l, c + 1] != null)
+                {
+                    TrocarTipos(l, c, l, c + 1);
+
+                    bool encontrou =
+                        EncontrarCombinacoes().Count >= 3;
+
+                    TrocarTipos(l, c, l, c + 1);
+
+                    if (encontrou)
+                        return true;
+                }
+
+                // TESTAR TROCA PARA BAIXO
+                if (l + 1 < linhas && pecas[l + 1, c] != null)
+                {
+                    TrocarTipos(l, c, l + 1, c);
+
+                    bool encontrou =
+                        EncontrarCombinacoes().Count >= 3;
+
+                    TrocarTipos(l, c, l + 1, c);
+
+                    if (encontrou)
+                        return true;
+                }
+            }
+        }
+
+        return false;
+    }
+
+    // TROCAR TEMPORARIAMENTE OS TIPOS PARA TESTAR UMA JOGADA
+    void TrocarTipos(int l1, int c1, int l2, int c2)
+    {
+        int temporario = tipos[l1, c1];
+
+        tipos[l1, c1] = tipos[l2, c2];
+        tipos[l2, c2] = temporario;
+    }
+
+    // VERIFICAR O TABULEIRO QUANDO O JOGO COMEÇA
+    IEnumerator VerificarTabuleiroInicial()
+    {
+        yield return null;
+
+        if (!ExisteJogadaPossivel())
+            yield return StartCoroutine(FazerRefresh());
+    }
+
+    // REFRESH AUTOMÁTICO
+    IEnumerator FazerRefresh()
+    {
+        Debug.Log("PIMBA CRUSH: Sem jogadas possíveis! A fazer refresh...");
+
+        yield return new WaitForSeconds(0.4f);
+
+        // DESTRUIR TODAS AS PEÇAS ANTIGAS
+        for (int l = 0; l < linhas; l++)
+        {
+            for (int c = 0; c < colunas; c++)
+            {
+                if (pecas[l, c] != null)
+                    Destroy(pecas[l, c]);
+
+                pecas[l, c] = null;
+                tipos[l, c] = -1;
+            }
+        }
+
+        // ESPERAR QUE O UNITY DESTRUA OS OBJETOS ANTIGOS
+        yield return null;
+
+        bool encontrouTabuleiro = false;
+        int tentativas = 0;
+
+        // CRIAR NOVOS TABULEIROS ATÉ EXISTIR UMA JOGADA
+        while (!encontrouTabuleiro && tentativas < 100)
+        {
+            tentativas++;
+
+            CriarTabuleiro();
+            yield return null;
+
+            encontrouTabuleiro = ExisteJogadaPossivel();
+        }
+
+        if (!encontrouTabuleiro)
+        {
+            Debug.LogError(
+                "PIMBA CRUSH: Não foi possível criar um tabuleiro com jogadas possíveis."
+            );
+        }
+        else
+        {
+            Debug.Log("PIMBA CRUSH: Novo tabuleiro pronto!");
+        }
+
+        AtualizarOrdemVisual();
+    }
 }
+
 
