@@ -1,6 +1,7 @@
 
 using UnityEngine;
 using UnityEngine.UI;
+using System.Collections;
 
 public class GameManager : MonoBehaviour
 {
@@ -32,13 +33,8 @@ public class GameManager : MonoBehaviour
     // SOM
     // ============================================================
 
-    // AudioSource que já utilizas para a música e volume.
     public AudioSource audioSource;
-
-    // Slider do volume.
     public Slider volumeSlider;
-
-    // Novos sons de vitória e derrota.
     public AudioClip somVitoria;
     public AudioClip somDerrota;
 
@@ -56,11 +52,9 @@ public class GameManager : MonoBehaviour
     public TabuleiroManager tabuleiroManager;
 
     // ============================================================
-    // VARIÁVEL DAS DEFINIÇÕES
+    // VARIÁVEIS
     // ============================================================
 
-    // false = vieram do início
-    // true = vieram do jogo
     private bool definicoesVieramDoJogo = false;
 
     // ============================================================
@@ -291,7 +285,6 @@ public class GameManager : MonoBehaviour
 
     public void MostrarVitoria()
     {
-        // Tocar som de vitória.
         if (audioSource != null && somVitoria != null)
         {
             audioSource.PlayOneShot(somVitoria);
@@ -325,7 +318,6 @@ public class GameManager : MonoBehaviour
 
     public void MostrarDerrota()
     {
-        // Tocar som de derrota.
         if (audioSource != null && somDerrota != null)
         {
             audioSource.PlayOneShot(somDerrota);
@@ -560,10 +552,44 @@ public class GameManager : MonoBehaviour
 
     public void IniciarJogo()
     {
-        if (tabuleiroManager != null)
-            tabuleiroManager.ReiniciarJogo();
+        if (tabuleiroManager == null)
+        {
+            Debug.LogError(
+                "PIMBA CRUSH: TabuleiroManager não está ligado!"
+            );
 
+            return;
+        }
+
+        // Ativar primeiro o painel do jogo.
         MostrarJogo();
+
+        // Esperar que o painel fique ativo.
+        StartCoroutine(ReiniciarTabuleiroDepoisDeAtivar());
+    }
+
+    private IEnumerator ReiniciarTabuleiroDepoisDeAtivar()
+    {
+        yield return null;
+
+        if (tabuleiroManager == null)
+            yield break;
+
+        if (!tabuleiroManager.gameObject.activeInHierarchy)
+        {
+            Debug.LogError(
+                "PIMBA CRUSH: O Tabuleiro continua desativado!"
+            );
+
+            yield break;
+        }
+
+        // Começar uma partida completamente nova.
+        tabuleiroManager.ReiniciarJogo();
+
+        Debug.Log(
+            "PIMBA CRUSH: Nova partida! 0 pontos e 45 movimentos."
+        );
     }
 
     // ============================================================
@@ -624,4 +650,3 @@ public class GameManager : MonoBehaviour
             Debug.Log("OK: " + nome);
     }
 }
-

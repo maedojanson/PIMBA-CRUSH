@@ -1,3 +1,4 @@
+
 using UnityEngine;
 using UnityEngine.UI;
 using TMPro;
@@ -29,16 +30,18 @@ public class TabuleiroManager : MonoBehaviour
     private bool aProcessar = false;
     private bool jogoTerminado = false;
     private GridLayoutGroup grelha;
+    private bool tabuleiroInicializado = false;
+
+    // Peça selecionada para controlos por toque/clique
+    private Peca pecaSelecionada = null;
 
     private int pontuacao = 0;
-    private int movimentos = 40;
+    private int movimentos = 45;
 
     private const int pontuacaoObjetivo = 250;
 
     void Start()
     {
-        ReiniciarJogo();
-
         if (prefabsPecas == null || prefabsPecas.Length < 3)
         {
             Debug.LogError("PIMBA CRUSH: São necessárias pelo menos 3 peças diferentes!");
@@ -61,19 +64,53 @@ public class TabuleiroManager : MonoBehaviour
 
         grelha.enabled = true;
 
+        // Inicializar os valores da primeira partida
+        pontuacao = 0;
+        movimentos = 45;
+        jogoTerminado = false;
+        aProcessar = false;
+        pecaSelecionada = null;
+
+        AtualizarTextos();
+
         CriarTabuleiro();
+        tabuleiroInicializado = true;
+
         StartCoroutine(VerificarTabuleiroInicial());
     }
 
-    // REINICIAR PONTUAÇÃO E MOVIMENTOS
+    // REINICIAR A PARTIDA COMPLETA
     public void ReiniciarJogo()
     {
+        // REINICIAR SEMPRE A PONTUAÇÃO E OS MOVIMENTOS
         pontuacao = 0;
-        movimentos = 40;
+        movimentos = 45;
+
+        // REINICIAR O ESTADO DO JOGO
         jogoTerminado = false;
         aProcessar = false;
+        pecaSelecionada = null;
 
+        // ATUALIZAR IMEDIATAMENTE OS TEXTOS
         AtualizarTextos();
+
+        // SE O TABULEIRO JÁ EXISTE, CRIAR UMA NOVA PARTIDA
+        if (tabuleiroInicializado &&
+            paiDoTabuleiro != null &&
+            prefabsPecas != null &&
+            prefabsPecas.Length >= 3)
+        {
+            StopAllCoroutines();
+
+            CriarTabuleiro();
+
+            // GARANTIR QUE OS TEXTOS CONTINUAM ATUALIZADOS
+            AtualizarTextos();
+
+            StartCoroutine(VerificarTabuleiroInicial());
+        }
+
+        Debug.Log("PIMBA CRUSH: Nova partida! 0 pontos e 45 movimentos.");
     }
 
     // ATUALIZAR OS TEXTOS
@@ -218,9 +255,42 @@ public class TabuleiroManager : MonoBehaviour
         );
     }
 
+    // SELECIONAR PEÇAS COM TOQUE OU CLIQUE
     public void ClicarNaPeca(Peca peca)
     {
-        // Reservado para seleção de peças.
+        if (aProcessar || jogoTerminado || peca == null)
+            return;
+
+        // Primeiro toque/clique: selecionar uma peça.
+        if (pecaSelecionada == null)
+        {
+            pecaSelecionada = peca;
+            return;
+        }
+
+        // Tocar novamente na mesma peça cancela a seleção.
+        if (pecaSelecionada == peca)
+        {
+            pecaSelecionada = null;
+            return;
+        }
+
+        int diferencaLinha = peca.linha - pecaSelecionada.linha;
+        int diferencaColuna = peca.coluna - pecaSelecionada.coluna;
+
+        // Só trocar peças vizinhas.
+        if (Mathf.Abs(diferencaLinha) + Mathf.Abs(diferencaColuna) == 1)
+        {
+            Peca anterior = pecaSelecionada;
+            pecaSelecionada = null;
+
+            ArrastarPeca(anterior, diferencaLinha, diferencaColuna);
+        }
+        else
+        {
+            // Selecionar a nova peça.
+            pecaSelecionada = peca;
+        }
     }
 
     // DETETAR ARRASTAMENTO
@@ -639,7 +709,6 @@ public class TabuleiroManager : MonoBehaviour
             }
         }
 
-        // ESPERAR QUE O UNITY DESTRUA OS OBJETOS ANTIGOS
         yield return null;
 
         bool encontrouTabuleiro = false;
@@ -651,6 +720,7 @@ public class TabuleiroManager : MonoBehaviour
             tentativas++;
 
             CriarTabuleiro();
+
             yield return null;
 
             encontrouTabuleiro = ExisteJogadaPossivel();
@@ -670,5 +740,7 @@ public class TabuleiroManager : MonoBehaviour
         AtualizarOrdemVisual();
     }
 }
+
+
 
 
